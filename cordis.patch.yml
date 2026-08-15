@@ -1,0 +1,10 @@
+# dsh plugin add 后,把下面这段合并进 profile 的 cordis.patch.yml
+#(~/.dsh/profiles/web/cordis.patch.yml),config 按你的部署改:
+- insert:
+    - id: dsh-mobile
+      name: 'dsh-mobile'
+      config:
+        target: your-server            # ssh 别名(网关所在服务器,免密可登)
+        remotePort: 13100             # 服务器侧隧道口(= dsh-gateway DSH_GATEWAY_UPSTREAM)
+        adminPort: 8103               # 网关管理面(仅服务器本机;插件经 ssh 调用)
+        publicUrl: https://dsh.example.com/pair   # 手机扫码落地页(网关公开 /pair)
