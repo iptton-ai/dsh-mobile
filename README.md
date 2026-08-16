@@ -39,6 +39,26 @@ dsh plugin --profile web add github:iptton-ai/dsh-mobile
 服务端网关的部署说明见
 [DeepseekHarnessApp](https://github.com/iptton-ai/DeepseekHarnessApp) 仓库。
 
+### CF 形态(dsh-gateway-worker)
+
+无服务器场景改用 Cloudflare Worker 网关:config 里给 `gateway`(Worker 网关
+地址)+ `adminKey`(部署时填的 ADMIN_KEY)即可,配对/设备管理直连 HTTPS、免
+ssh;隧道由机器级 cloudflared 服务负责(本插件不再拉 ssh,只探测网关
+healthz 显示通断)。`publicUrl` 指向 Worker 的 `/pair` 落地页。
+
+```yaml
+- id: dsh-mobile
+  name: 'dsh-mobile'
+  config:
+    gateway: https://gw.example.com
+    adminKey: <部署 Worker 时的 ADMIN_KEY>
+    publicUrl: https://gw.example.com/pair
+```
+
+两形态可并存:保留 `target` 则 ssh 隧道照常(存量手机凭证继续可用),
+webui 配对/设备管理走 CF —— 平滑迁移。Worker 网关部署
+([Deploy Button / AGENT-DEPLOY.md](https://github.com/iptton-ai/dsh-gateway-worker))。
+
 ## 环境变量(测试覆盖)
 
 `DSH_MOBILE_TARGET` / `DSH_MOBILE_REMOTE_PORT` / `DSH_MOBILE_ADMIN_PORT` / `DSH_MOBILE_PUBLIC_URL` / `DSH_MOBILE_LABEL`
