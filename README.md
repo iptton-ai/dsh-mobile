@@ -33,9 +33,18 @@ SSH 反向隧道 + GUI 扫码配对 + 设备管理。配合移动客户端
 dsh plugin --profile web add github:iptton-ai/dsh-mobile
 ```
 
-然后把 [cordis.patch.yml](cordis.patch.yml) 里的 insert 段合并进
-`~/.dsh/profiles/web/cordis.patch.yml`,config 按你的部署改
-(target/remotePort/adminPort/publicUrl),重启 `dsh web`。
+然后把 [cordis.patch.yml](cordis.patch.yml) 里的整段(insert 段 + 前面的
+`directory-picker` 禁用行)合并进 `~/.dsh/profiles/web/cordis.patch.yml`,
+config 按你的部署改(target/remotePort/adminPort/publicUrl),重启 `dsh web`。
+
+### 移动端目录浏览(为什么禁用 `directory-picker`)
+
+App 里「添加工作区」需要 `host.listDirectory` / `host.createDirectory`,而官方
+auto 选择器在桌面形态(loopback 绑定 + GUI 会话启动)会解析成 **native**
+—— 宿主屏上弹 OS 对话框,远程客户端无法驱动,这两个 RPC 直接被拒
+(`directory-picker-unavailable`)。模板里禁用 auto、成对挂上 browse 后端 +
+browse 前端,手机即可浏览/下钻/新建文件夹选任意宿主路径;代价是桌面 web
+「添加工作区」也从 OS 对话框变成网页内浏览(pick/browse 在上游是互斥设计)。
 
 前置:`ssh <target>` 免密可登你的网关服务器(信任根 = 你的 ssh key:
 能发起配对 = 有服务器权限,管理面公网不可达,只经 ssh 调用)。

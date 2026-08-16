@@ -1,6 +1,19 @@
 # dsh plugin add 后,把下面这段合并进 profile 的 cordis.patch.yml
 #(~/.dsh/profiles/web/cordis.patch.yml),config 按你的部署改:
+#
+# 目录浏览钉死(移动端在 App 里选宿主文件夹/添加工作区):官方 auto 选择器在
+# 桌面形态(loopback 绑定 + GUI 会话启动)解析成 native —— 宿主屏弹 OS 对话框,
+# 远程客户端无法驱动,host.listDirectory / host.createDirectory 会被服务端拒绝
+# (directory-picker-unavailable)。服务移动端的主机禁用 auto 行,改挂 browse
+# 交互(后端 + web 前端成对,缺一不可:只挂后端会让桌面 web 的入口消失)。
+# 代价:桌面 web「添加工作区」也从 OS 对话框变成网页内浏览。
+- id: directory-picker
+  disabled: true
 - insert:
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: ui-directory-picker-browse
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
     - id: dsh-mobile
       name: 'dsh-mobile'
       config:
