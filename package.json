@@ -4,6 +4,21 @@
   "description": "singleman mobile access for DeepSeek Harness: reverse SSH tunnel + GUI QR pairing + device management, one plugin.",
   "type": "module",
   "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.0"
+  },
+  "dsh": {
+    "client": {
+      "inject": ["@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-ui-sidebar"],
+      "platform": "web"
+    }
+  },
   "license": "MIT",
   "keywords": ["dsh", "deepseek-harness", "plugin", "mobile", "pairing"],
   "files": ["lib", "cordis.patch.yml", "README.md"]
