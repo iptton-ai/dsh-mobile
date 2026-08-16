@@ -42,9 +42,11 @@ dsh plugin --profile web add github:iptton-ai/dsh-mobile
 ### CF 形态(dsh-gateway-worker)
 
 无服务器场景改用 Cloudflare Worker 网关:config 里给 `gateway`(Worker 网关
-地址)+ `adminKey`(部署时填的 ADMIN_KEY)即可,配对/设备管理直连 HTTPS、免
-ssh;隧道由机器级 cloudflared 服务负责(本插件不再拉 ssh,只探测网关
-healthz 显示通断)。`publicUrl` 指向 Worker 的 `/pair` 落地页。
+地址)+ `adminKey`(部署时填的 ADMIN_KEY)+ `cfTunnelId`/`cfHostname`
+(cloudflared 隧道)即可。配对/设备管理直连 HTTPS、免 ssh;cloudflared 隧道
+**由本插件随 dsh web 拉起**(与 ssh 隧道同款生命周期:断线退避重启、dsh 退出
+即断、config.yml 按运行时端口自动生成),不依赖任何机器级服务。
+`publicUrl` 指向 Worker 的 `/pair` 落地页。
 
 ```yaml
 - id: dsh-mobile
@@ -52,8 +54,14 @@ healthz 显示通断)。`publicUrl` 指向 Worker 的 `/pair` 落地页。
   config:
     gateway: https://gw.example.com
     adminKey: <部署 Worker 时的 ADMIN_KEY>
+    cfTunnelId: <cloudflared tunnel UUID>
+    cfHostname: mac-xxxx.example.com   # 隧道公网主机名(DNS 记录指向)
     publicUrl: https://gw.example.com/pair
 ```
+
+插件外的一次性准备(仅三步,之后全自动):
+`cloudflared tunnel login` → `cloudflared tunnel create <名>`(记下 UUID)
+→ `cloudflared tunnel route dns <名> <cfHostname>`。
 
 两形态可并存:保留 `target` 则 ssh 隧道照常(存量手机凭证继续可用),
 webui 配对/设备管理走 CF —— 平滑迁移。Worker 网关部署
