@@ -1,7 +1,7 @@
 {
   "name": "dsh-mobile",
   "version": "0.1.0",
-  "description": "singleman mobile access for DeepSeek Harness: reverse SSH tunnel + GUI QR pairing + device management, one plugin.",
+  "description": "DshAPP mobile access for DeepSeek Harness: reverse SSH tunnel + GUI QR pairing + device management, one plugin.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
