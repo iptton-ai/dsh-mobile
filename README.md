@@ -121,3 +121,24 @@ label 解析层级:**用户 settings 层**(「移动接入」dialog 或 dsh 设�
   ControlMaster 复用(ControlPersist 10m),轮询不放大连接数。
 
 MIT License.
+## 多宿主 / 多租户(2026-08-18)
+
+两版网关均已支持「一个网关挂 N 台 dsh 宿主」与「多租户共享网关」(见各自仓库
+`004` 迁移 / `tenants` 表)。插件侧的配合语义:
+
+- **tokens 按本机归属过滤**:dialog 设备表/在线角标只统计绑定本机的令牌 ——
+  Rust 形态按 `upstream_port === remotePort`,CF 形态按 `tunnel_host === cfHostname`
+  (未配 cfHostname 时保守不过滤 = 单宿主旧语义)。多台 Mac 共用一个网关时,
+  每台面板只见自己的设备;`upstream_port` 为 null 的密码登录令牌不在宿主面板展示。
+- **Rust 多租户免 ssh 管理通道**:配置 `adminUrl`(网关公开管理面基址,如
+  `https://gw.example.com`)+ 租户密钥(dialog「租户密钥」栏或
+  `DSH_MOBILE_TENANT_KEY`/`DSH_MOBILE_ADMIN_URL` env)后,claim/status/tokens/
+  revoke 走 HTTPS 直连网关公开面,网关按租户钥把全部操作围栏在本租户 ——
+  不再依赖服务器 ssh(数据隧道的 `ssh -R` 仍需 target,租户通常配受限
+  ssh 账号 + sshd `PermitListen` 钉死本宿主端口)。未配时回落传统 ssh 通道
+  (运营者形态,行为不变)。
+- **宿主端口分配**:同网关多台 Mac 各占一个 `remotePort`(Rust,13100–13199 段,
+  运营者经 `/admin/hosts` 登记归属);CF 形态每台一个 cloudflared 隧道主机名
+  (`/admin/hosts` 登记)。默认 13100 会撞车 —— 多机部署必改。
+- 配对协议本身多宿主原生(同一码多 offers 手机点选),QR 邀请 URL 可带 `t=`
+  租户参数锚定(网关侧过滤跨租户 offers);手输模式为开放配对,靠主机码 OOB 把关。
