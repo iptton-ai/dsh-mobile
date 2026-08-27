@@ -1,5 +1,8 @@
 # dsh plugin add 后,把下面这段合并进 profile 的 cordis.patch.yml
-#(~/.dsh/profiles/web/cordis.patch.yml),config 按你的部署改:
+#(~/.dsh/profiles/web/cordis.patch.yml),config 按你的部署改。
+# p2p-only:config 键与旧(中转)版同名 —— 存量部署改插件不改配置即可迁移;
+# remotePort 语义变化:不再是服务器隧道口,只是信令路由键(13100-13199
+# 每机一个,网关按它把手机连到本宿主)。
 #
 # 目录浏览钉死(移动端在 App 里选宿主文件夹/添加工作区):官方 auto 选择器在
 # 桌面形态(loopback 绑定 + GUI 会话启动)解析成 native —— 宿主屏弹 OS 对话框,
@@ -18,6 +21,7 @@
       name: 'dsh-mobile'
       config:
         target: your-server            # ssh 别名(网关所在服务器,免密可登)
-        remotePort: 13100             # 服务器侧隧道口(= dsh-gateway DSH_GATEWAY_UPSTREAM)
         adminPort: 8103               # 网关管理面(仅服务器本机;插件经 ssh 调用)
-        publicUrl: https://dsh.example.com/pair   # 手机扫码落地页(网关公开 /pair)
+        remotePort: 13100             # 宿主标识(信令路由键,13100-13199 每机一个)
+        publicUrl: https://dsh.example.com/pair   # 手机扫码落地页(网关公开 /pair;信令 WS 同域)
+        # iceServers: 可选(JSON 数组字符串 [{urls,[username],[credential]}];缺省公共 STUN)
