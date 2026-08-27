@@ -1,148 +1,101 @@
-# dsh-mobile
+# dsh-mobile(P2P)
 
-DeepSeek Harness 的移动接入插件:一条命令把 Mac 侧的全部移动接入收进 dsh ——
-SSH 反向隧道 + GUI 扫码配对 + 设备管理。配合移动客户端
+DeepSeek Harness 的移动接入插件(p2p-only 重构版):网关只做
+配对 + WebRTC 信令,**业务流量全部手机 ↔ Mac 直连**(DataChannel,
+DTLS 加密),服务器零中转、零隧道。配合移动客户端
 [DeepseekHarnessApp](https://github.com/iptton-ai/DeepseekHarnessApp) 使用。
 
-## 功能
+```
+手机 App ──wss(仅信令)──→ 网关 ←─wss(仅信令)─ 本插件
+   └────────── WebRTC DataChannel(直连,流量不经服务器)──────────┘
+```
 
-- **隧道**:`dsh web` 启动即自动 `ssh -R`(断线退避重启,`--port 0` 也正确),dsh 退出即断;
-  CF 形态再拉起 cloudflared,两通道独立并存 —— dialog 隧道区**有几条显示几条**
-  (形态徽章 `Rust`/`CF` + 「配对走这条」标记);
-- **主界面入口**:侧栏底部「移动接入」按钮(官方 `sidebar.footer.action` 座,与设置按钮同区;
-  宽栏=图标+文字行,收起栏=36px 圆钮),点击弹**原生 React dialog**(同源直调管理 API,无
-  iframe,dsw 主题变量染色)—— 浏览器半边由 package.json 的 `dsh.client` 声明自动收录进
-  web boot 图,无需配置;
-- **在线指示器**:入口按钮兼指示器 —— 有手机在线(持有事件 WebSocket)时点亮手机图标并
-  显示台数(收起栏为角标数字);数据来自网关 tokens 清单的 `connected` 字段(M6.3 在线
-  计数),常态 15s 轮询,dialog 打开时 4s,页面隐藏时暂停;
-- **配对**(原生 dialog)—— 两种发起方式(双向亮码防抢注):
-  - **扫码(推荐)**:点「配对手机」出二维码,App 内置相机直接扫
-    (或系统相机扫 → 落地页「复制」→ App 粘贴)→ 绿卡点选即成;
-  - **手输应约**:手机 App 先「生成配对码」,在 dialog 输入框输入 10 位码点「应约」,
-    dialog 显示主机码,回手机点选一致的那个(码不存在/过期快速失败);
-- **机器名**:本机在手机端「已连接 xxx」里显示的名字。默认取设备 hostname,
-  在 dialog 随时可改(dsh-mobile settings 命名空间 `label` 字段,持久化进
-  用户 settings 文档,改动即时生效 —— 新 claim、二维码 `l=` 参数与手机端展示同步);
-- **设备管理**:已配对设备清单 + 一键吊销(30 天设备令牌);「隧道」列带形态徽章
-  (令牌归属网关:`Rust`=绑定端口,`CF`=cloudflared 主机名);
-- **Web 远程访问(浏览器,按宿主)**:dialog「Web 远程访问(浏览器)」区为本机宿主设置
-  独立登录密码(网关按 `remotePort` 分端口存取,argon2 落库)—— 浏览器打开网关 web
-  域名时登录页下拉选择宿主,各宿主密码各自生效、轮换/清除只影响本宿主会话。机器名
-  推送(启动/改名时)刷新登录页下拉展示名;仅 Rust(ssh 运营者通道)网关支持。
+- **配对**:扫码/手输(双向亮码防抢注);设备令牌仍由网关签发/吊销,
+  令牌绑定的端口现在只是信令路由键;
+- **直连**:Mac 是 offerer;手机 `connect` → 网关派 sid → offer/answer/
+  ICE 经信令面交换 → DataChannel `dsh` 建立;
+- **虚拟流**:DataChannel 上的 vstream 二进制帧(OPEN/DATA/CLOSE,
+  16KB 分片)多路复用 TCP 字节流,Mac 侧落地 `127.0.0.1:<dsh web 端口>`;
+  手机侧同样起本地回环代理 —— 两端 HTTP/WebSocket 栈零改动;
+- **UI**:侧栏 foot「移动接入」dialog:P2P 状态(信令通道/活跃会话/
+  虚拟流计数)+ 机器名 + 配对 + 设备管理(链路徽章 P2P 直连/中转/离线)
+  + 安全事件横幅(配对/吊销 OS 通知与角标)。
+
+协议细节(信令消息 + vstream 帧格式)见 [PROTOCOL.md](PROTOCOL.md)。
 
 ## 安装
 
 ```bash
-dsh plugin --profile web add github:iptton-ai/dsh-mobile
+dsh plugin --profile web add github:iptton-ai/dsh-mobile   # 或本地目录
+cd <插件目录> && npm install   # node-datachannel 是预编译原生模块,必须装
 ```
 
-然后把 [cordis.patch.yml](cordis.patch.yml) 里的整段(insert 段 + 前面的
+把 [cordis.patch.yml](cordis.patch.yml) 的 insert 段(+ 前面的
 `directory-picker` 禁用行)合并进 `~/.dsh/profiles/web/cordis.patch.yml`,
-config 按你的部署改(target/remotePort/adminPort/publicUrl),重启 `dsh web`。
+config 按你的部署改,重启 `dsh web`。
 
-### 移动端目录浏览(为什么禁用 `directory-picker`)
+前置:
+- 网关(dsh-mobile-gateway)已部署信令面(`/signal/*` +
+  `/admin/signal/ticket`,signal 提交之后版本);
+- `ssh <target>` 免密可登网关服务器(信任根 = ssh key;host ticket 经
+  ssh 管理面签发,TTL 900s,插件每 5min 刷新);
+- 手机 App 为支持 P2P 的版本(探测 `/signal/caps` 自动走直连)。
 
-App 里「添加工作区」需要 `host.listDirectory` / `host.createDirectory`,而官方
-auto 选择器在桌面形态(loopback 绑定 + GUI 会话启动)会解析成 **native**
-—— 宿主屏上弹 OS 对话框,远程客户端无法驱动,这两个 RPC 直接被拒
-(`directory-picker-unavailable`)。模板里禁用 auto、成对挂上 browse 后端 +
-browse 前端,手机即可浏览/下钻/新建文件夹选任意宿主路径;代价是桌面 web
-「添加工作区」也从 OS 对话框变成网页内浏览(pick/browse 在上游是互斥设计)。
+## 配置
 
-前置:`ssh <target>` 免密可登你的网关服务器(信任根 = 你的 ssh key:
-能发起配对 = 有服务器权限,管理面公网不可达,只经 ssh 调用)。
-服务端网关的部署说明见
-[DeepseekHarnessApp](https://github.com/iptton-ai/DeepseekHarnessApp) 仓库。
+cordis.patch.yml 的 `dsh-mobile` 行 config(`DSH_MOBILE_*` 环境变量可覆盖):
 
-### CF 形态(dsh-gateway-worker)
+| 键 | 说明 | 默认 |
+|---|---|---|
+| `target` | ssh 别名(网关服务器) | 必填 |
+| `adminPort` | 网关管理面端口(仅服务器本机;插件经 ssh 调用) | 8103 |
+| `remotePort` | 宿主标识(信令路由键,13100-13199 每机一个;不再是隧道口) | 13100 |
+| `publicUrl` | 扫码落地页 URL(网关公开 `/pair`;信令 WS 同域推导) | 必填 |
+| `label` | 机器名(缺省 hostname;面板可改,持久化) | — |
+| `iceServers` | ICE 服务器(JSON 数组字符串;缺省公共 STUN,无 TURN) | 公共 STUN |
 
-无服务器场景改用 Cloudflare Worker 网关:config 里给 `gateway`(Worker 网关
-地址)+ `cfTunnelId`/`cfHostname`(cloudflared 隧道)即可。配对/设备管理直连
-HTTPS、免 ssh;cloudflared 隧道**由本插件随 dsh web 拉起**(与 ssh 隧道同款
-生命周期:断线退避重启、dsh web 退出即断、独立配置文件按运行时端口自动生成,
-默认 `~/.cloudflared/dsh-mobile.yml`),不依赖任何机器级服务。`publicUrl` 指向
-Worker 的 `/pair` 落地页。
+环境变量:`DSH_MOBILE_TARGET` / `DSH_MOBILE_ADMIN_PORT` /
+`DSH_MOBILE_REMOTE_PORT` / `DSH_MOBILE_PUBLIC_URL` / `DSH_MOBILE_LABEL` /
+`DSH_MOBILE_ICE_SERVERS`
 
-**ADMIN_KEY 不进配置文件**:在「移动接入」dialog 的「管理密钥」
-栏填写部署 Worker 时的 ADMIN_KEY —— 持久化在 dsh 用户层 settings,保存即
-生效(配对传输动态判定,无需重启);GET 只回掩码不回显全值,留空保存即清除。
+## 从中转版迁移(p2p-only 分支)
 
-```yaml
-- id: dsh-mobile
-  name: 'dsh-mobile'
-  config:
-    gateway: https://gw.example.com
-    cfTunnelId: <cloudflared tunnel UUID>
-    cfHostname: mac-xxxx.example.com   # 隧道公网主机名(DNS 记录指向)
-    publicUrl: https://gw.example.com/pair
-```
+config 键与旧版同名,存量部署**改插件不改配置**即可;语义差异与移除项:
 
-插件外的一次性准备(仅三步,之后全自动):
-`cloudflared tunnel login` → `cloudflared tunnel create <名>`(记下 UUID)
-→ `cloudflared tunnel route dns <名> <cfHostname>`。
+- **移除 ssh -R 反向隧道 / cloudflared / CF Worker 网关形态**:服务器不再
+  承载业务流量,带宽占用 ≈0(几 KB 信令);`sockDir`/`gateway`/`cfTunnelId`/
+  `cfHostname`/`adminKey`/`adminUrl`/`tenantKey` 等键全部失效;
+- **移除 Web 远程访问(浏览器经网关登录)**:该功能依赖网关中转链路;
+- **移除多租户免 ssh 管理通道**(`/admin/signal/ticket` 只在服务器本机
+  管理面挂载,P2P 的 host ticket 必须走 ssh);
+- `remotePort` 从「服务器隧道口」变为「信令路由键」—— 多宿主仍各占一个
+  (13100-13199),网关按它把手机信令路由到本宿主;
+- 旧客户端(仍持中转 WS 的 App 版本)在网关侧照常工作(回退形态),
+  设备表以「中转」徽章标注;网关 `relay.rs` 保留给旧客户端。
 
-两形态可并存:保留 `target` 则 ssh 隧道照常(存量手机凭证继续可用),
-webui 配对/设备管理走 CF —— 平滑迁移。Worker 网关部署
-([Deploy Button / AGENT-DEPLOY.md](https://github.com/iptton-ai/dsh-gateway-worker))。
-
-### 双网关并存的配对会合(claim 双发)
-
-两形态同时配置时,配对 pending 只存在于手机 start 的那个网关(两网关 DB
-不互通),打错网关的症状是「手机停在等待页,claim 404 no phone waiting」。
-插件对 claim / status / 令牌清单 / 吊销一律**双发**到全部可用传输
-(CF = `gateway`+ADMIN_KEY,Rust = ssh `target`):手机等在哪个网关,哪边
-就成交,另一边的 404 忽略 —— 手输应约不再要求手机与 `publicUrl` 同网关;
-令牌清单为两边合并(逐条带 `via` 徽章),吊销两边同发。`publicUrl` 仅作
-扫码锚定(QR 编码它)与展示;唯一例外:扫码模式锚定 CF 而密钥缺失时仍
-fail-closed 提示补钥(双发救不了锚定网关本身调不了)。
-
-## 环境变量(测试覆盖)
-
-`DSH_MOBILE_TARGET` / `DSH_MOBILE_REMOTE_PORT` / `DSH_MOBILE_ADMIN_PORT` / `DSH_MOBILE_PUBLIC_URL` / `DSH_MOBILE_LABEL`
-
-## 机器名与 `/pair/api/host`
-
-手机 App 持设备令牌经网关隧道访问本插件(web 信任面内),连接就绪后
-`GET /pair/api/host` → `{ok, label, hostname, port}`,取 `label` 显示「已连接 <机器名>」。
-label 解析层级:**用户 settings 层**(「移动接入」dialog 或 dsh 设置页编辑)> **组合 base**
-(cordis.patch.yml 的 `label` config / `DSH_MOBILE_LABEL` 环境变量)> **设备 hostname**。
-改名即时生效(无需重启),已发令牌的 `host_label` 快照不回填,手机端以 `/api/host` 为准。
+打洞失败(对称 NAT 等)无 TURN 时连接失败:App 提示切回中转模式。
+要 TURN 时给 `iceServers` 配(或网关 env `DSH_GATEWAY_ICE_SERVERS`),
+经 `/signal/caps` 与 ack 下发。
 
 ## 安全模型
 
-- 管理 API(`/pair/api/*`)仅接受 loopback Host(dsh 绑 0.0.0.0 也不暴露给局域网);
-- 管理 API 同源三重门(防恶意网页跨源 CSRF):写操作强制 `x-dsh-mobile` 自定义头
-  (跨源必过 CORS 预检)+ `Sec-Fetch-Site`/`Origin` 非同源即拒 + JSON 体限
-  `application/json`;原生客户端(App / curl)不带浏览器头,不受影响;
-- 经 ssh 的管理面调用 payload 一律 base64 传输、远端解码再喂 curl(不拼 shell
-  字符串);`jti` 等入参做字符白名单(注入纵深);
-- cloudflared 配置写入独立文件(默认 `~/.cloudflared/dsh-mobile.yml`),拒绝
-  覆盖非本插件生成的配置;
-- 二维码内容 = 公网落地页 URL(fragment 携带配对码+主机码,不进服务器日志);
-- 配对秘密 43 位只存在手机内存;令牌可随时吊销(本页或服务器管理面);
-- 在线状态 = 该令牌当前是否持有下行 WS(网关内存计数,不落盘);ssh 调用带
-  ControlMaster 复用(ControlPersist 10m),轮询不放大连接数。
+- 管理 API(`/pair/api/*`)仅接受 loopback Host + 同源三重门
+  (Sec-Fetch-Site/Origin 双检、写操作强制 `x-dsh-mobile` 头、JSON 体限
+  `application/json`);
+- 经 ssh 的管理面调用 payload 一律 base64 传输(不拼 shell 字符串);
+  host ticket 凭证不出服务器(JWT 网关侧签发);
+- 业务通道安全 = DTLS(WebRTC 强制);信令安全 = 配对令牌 + ssh 信任根;
+- 配对秘密 43 位只存在手机内存;令牌可随时吊销;安全事件(配对成交/
+  吊销)OS 通知 + 面板横幅显性化。
+
+## 端到端冒烟
+
+```bash
+npm install
+GATEWAY=https://dsh.example.com ADMIN=http://127.0.0.1:8103 node tools/e2e-smoke.mjs
+```
+
+模拟「手机 connect → offer/answer → vstream 往返」全链路,通过判据为
+消息经 P2P 通道原样返回(需网关管理面可达,经 ssh 转发本地端口)。
 
 MIT License.
-## 多宿主 / 多租户(2026-08-18)
-
-两版网关均已支持「一个网关挂 N 台 dsh 宿主」与「多租户共享网关」(见各自仓库
-`004` 迁移 / `tenants` 表)。插件侧的配合语义:
-
-- **tokens 按本机归属过滤**:dialog 设备表/在线角标只统计绑定本机的令牌 ——
-  Rust 形态按 `upstream_port === remotePort`,CF 形态按 `tunnel_host === cfHostname`
-  (未配 cfHostname 时保守不过滤 = 单宿主旧语义)。多台 Mac 共用一个网关时,
-  每台面板只见自己的设备;`upstream_port` 为 null 的密码登录令牌不在宿主面板展示。
-- **Rust 多租户免 ssh 管理通道**:配置 `adminUrl`(网关公开管理面基址,如
-  `https://gw.example.com`)+ 租户密钥(dialog「租户密钥」栏或
-  `DSH_MOBILE_TENANT_KEY`/`DSH_MOBILE_ADMIN_URL` env)后,claim/status/tokens/
-  revoke 走 HTTPS 直连网关公开面,网关按租户钥把全部操作围栏在本租户 ——
-  不再依赖服务器 ssh(数据隧道的 `ssh -R` 仍需 target,租户通常配受限
-  ssh 账号 + sshd `PermitListen` 钉死本宿主端口)。未配时回落传统 ssh 通道
-  (运营者形态,行为不变)。
-- **宿主端口分配**:同网关多台 Mac 各占一个 `remotePort`(Rust,13100–13199 段,
-  运营者经 `/admin/hosts` 登记归属);CF 形态每台一个 cloudflared 隧道主机名
-  (`/admin/hosts` 登记)。默认 13100 会撞车 —— 多机部署必改。
-- 配对协议本身多宿主原生(同一码多 offers 手机点选),QR 邀请 URL 可带 `t=`
-  租户参数锚定(网关侧过滤跨租户 offers);手输模式为开放配对,靠主机码 OOB 把关。
