@@ -1,7 +1,7 @@
 {
   "name": "dsh-mobile",
   "version": "0.2.0",
-  "description": "DshAPP mobile access for DeepSeek Harness: P2P WebRTC DataChannel direct link (signaling-only gateway, no traffic relay) + QR pairing + device management, one plugin.",
+  "description": "DshAPP mobile access for DeepSeek Harness: CF Worker gateway (pairing + WebRTC signaling only) + P2P DataChannel direct link, no traffic relay, one plugin.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
