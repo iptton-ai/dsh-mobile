@@ -45,12 +45,15 @@ cordis.patch.yml 的 `dsh-mobile` 行 config(`DSH_MOBILE_*` 环境变量可覆�
 
 | 键 | 说明 | 默认 |
 |---|---|---|
-| `gateway` | CF Worker 网关地址(如 `https://dsh.pan2017.cn`) | 必填 |
-| `adminKey` | 管理密钥(部署 Worker 时的 ADMIN_KEY,≥16 字符) | 必填 |
+| `gateway` | CF Worker 网关地址(如 `https://dsh.example.com`) | 必填 |
+| `adminKey` | 管理密钥(部署 Worker 时的 ADMIN_KEY,≥16 字符)。**优先级:env `DSH_MOBILE_ADMIN_KEY` > 面板「管理密钥」栏(用户 settings)> 此处 config** —— config 是明文模板位,profile yml 常随 dotfiles 同步,能不用就不用 | 必填* |
 | `host` | 宿主路由键(多宿主各占一个;仅登记标识,无隧道语义) | `<短主机名>.p2p` |
 | `publicUrl` | 扫码落地页 | `<gateway>/pair` |
 | `label` | 机器名(缺省 hostname;面板可改,持久化) | — |
-| `iceServers` | ICE 服务器(JSON 数组字符串;缺省公共 STUN,无 TURN) | 公共 STUN |
+| `iceServers` | ICE 服务器(JSON 数组字符串;缺省公共 STUN,无 TURN;只作用于 Mac 侧 gather,手机侧由网关 `ICE_SERVERS` 下发) | 公共 STUN |
+
+\* adminKey 三处任一有效即可;全缺时插件**不再拒绝加载**(2026-08-29 前
+会在启动时 throw),配对/信令以运行时错误文案指路,面板「管理密钥」栏可补。
 
 环境变量:`DSH_MOBILE_GATEWAY` / `DSH_MOBILE_ADMIN_KEY` / `DSH_MOBILE_HOST` /
 `DSH_MOBILE_PUBLIC_URL` / `DSH_MOBILE_LABEL` / `DSH_MOBILE_ICE_SERVERS`
@@ -59,6 +62,10 @@ cordis.patch.yml 的 `dsh-mobile` 行 config(`DSH_MOBILE_*` 环境变量可覆�
 
 - 管理通道从「ssh 到网关服务器 loopback」换成「HTTPS+Bearer adminKey 直连
   Worker」:不再需要 `target`/`adminPort`,也不再依赖任何服务器与 ssh key;
+- **adminKey 迁移(2026-08-29 修复)**:旧版在 webui「管理密钥」栏保存过的
+  密钥存储在 dsh 用户 settings,升级后**自动沿用**(优先级 env > settings >
+  config);此前一段时间(78974c0–6f1dd43)settings 值被静默忽略、缺 config
+  即加载失败 —— 升级到本版后两个问题都不存在,面板密钥栏同步恢复;
 - `remotePort`(服务器隧道口)→ `host`(路由键):多宿主仍各占一个,
   网关按它把手机信令路由到本宿主;
 - 移除 ssh -R / cloudflared / Rust 网关 / CF Worker 中转面 / Web 远程访问

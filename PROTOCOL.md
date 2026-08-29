@@ -5,9 +5,9 @@ yltech.store 网关只做**配对 + WebRTC 信令**,不再中转任何业务流�
 DataChannel 上跑虚拟字节流(vstream),Mac 侧落地回 `127.0.0.1:<dsh web 端口>`。
 
 ```
-手机 App ──wss(signaling only)──→ yltech.store 网关 ←─wss─ Mac 插件 dsh-remote
-   │                                                      │
-   └────────── WebRTC DataChannel(直连,流量不经服务器)────┘
+手机 App ──wss(signaling only)──→ 网关 ←─wss─ Mac 插件 dsh-mobile
+   │                                    │
+   └────────── WebRTC DataChannel(直连,流量不经服务器)──────┘
 ```
 
 ## 1. 信令(网关公开面,复用现有 TLS 反代)
@@ -20,13 +20,16 @@ WS 端点(均 JSON 文本帧):
 | `GET /signal/client?token=<device-jwt>` | 设备令牌(配对签发) | 手机按需信令通道 |
 | `GET /signal/caps` | 无 | 能力探测:`{"signaling":true,"ice":[...]}` |
 
-**host ticket**:Mac 经 ssh 管理面 `POST /admin/signal/ticket {port}` 获取,
-JWT claims `{sub:"dsh-host", port, iat, exp}`(TTL 900s,Mac 每 5min 刷新)。
-port = 该宿主在网关注册的标识(沿用原隧道端口段,仅作路由键,不再有隧道)。
+**host ticket**:Mac 经管理面(公网 HTTPS + Bearer adminKey/租户钥)
+`POST /admin/signal/ticket {"host":"<宿主路由键>"}` 获取,JWT claims
+`{sub:"dsh-host", host, iat, exp}`(TTL 900s,Mac 每 5min 刷新)。
+host = 宿主在网关的登记标识(如 `<主机名>.p2p`),仅作信令路由键,无隧道语义;
+已登记宿主受租户归属仲裁(别家租户钥签不出它的 ticket,防宿主冒充)。
 
 ### 消息
 
-- 手机→网关 `{"t":"connect"}`;网关按令牌绑定 port 找在线 host,找不到回
+- 手机→网关 `{"t":"connect"}`;网关按令牌绑定的 host 路由键
+  (tokens.tunnel_host)找在线 host,找不到回
   `{"t":"error","error":"host-offline"}`;找到则生成 `sid`,回
   `{"t":"ack","sid":..,"ice":[...]}` 并向 host 转 `{"t":"offer-req","sid":..,"jti":..,"device":..}`。
 - **Mac 是 offerer**(DataChannel 创建方):收到 offer-req 即建
@@ -37,7 +40,8 @@ port = 该宿主在网关注册的标识(沿用原隧道端口段,仅作路由�
 - 双向 SDP/ICE 统一封装:`{"t":"signal","sid":..,"data":{"type":"offer"|"answer"|"candidate",...}}`,
   网关按 sid 转发给对端。
 - 任一侧断开 → 网关向对端发 `{"t":"bye","sid":..}`。
-- 心跳:网关每 20s 发 `{"t":"ping"}`,60s 无 pong/上行即断。
+- 心跳:网关每 20s 发 `{"t":"ping"}`,客户端须回 `{"t":"pong"}`(实现层为
+  DO 闹钟轮询全体套接字;**没有**「60s 静默掐断」计数 —— 网关只发不判)。
 
 网关只转发上述 JSON,**永不接触业务字节**。
 
@@ -63,9 +67,11 @@ payload bytes
 
 ## 3. 回退与安全
 
-- 打洞失败(对称 NAT 等)无 TURN 时连接失败:App 提示切回中转模式
-  (旧 dsh-mobile 网关面仍在)。
-- ICE 服务器:网关 env `DSH_GATEWAY_ICE_SERVERS`(JSON 数组,含
-  `urls/username/credential`),经 `/signal/caps` 与 ack 下发。
-- 信令安全 = 配对令牌 + 管理面 ssh 信任根,与原模型一致;
-  业务通道安全 = DTLS-SRTP(WebRTC 强制)。
+- 打洞失败(对称 NAT 等)无 TURN 时连接失败:**没有中转可退**(P2P-only,
+  旧中转面已删除,网关对旧客户端一律 410 指路);需要打通时给 ICE 配 TURN。
+- ICE 服务器(两侧来源不对称是现状):手机侧用网关 Worker env `ICE_SERVERS`
+  (JSON 数组,含 `urls/username/credential`;空 = 公共 STUN)经 `/signal/caps`
+  与 connect ack 下发;Mac 侧用插件 config `iceServers` / env
+  `DSH_MOBILE_ICE_SERVERS`(本地 gather,不取网关下发)。
+- 信令安全 = 设备令牌(手机)+ host ticket(管理面 ADMIN_KEY/租户钥签发,
+  宿主归属仲裁);业务通道安全 = DTLS(WebRTC 强制)。
