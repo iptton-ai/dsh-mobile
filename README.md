@@ -77,6 +77,30 @@ dsh plugin --profile web install        # 重跑安装,补跑被跳过的脚本
 审批写入 profile 的 `pnpm-workspace.yaml` 持久生效,后续
 `dsh plugin --profile web update` 不再丢。
 
+#### 验证二进制真的落盘了
+
+第 2 步做完别急着重启,先确认预编译二进制存在(路径里的版本号以实际为准):
+
+```bash
+ls node_modules/.pnpm/node-datachannel@*/node_modules/node-datachannel/build/Release/
+# 应能看到 node_datachannel.node
+```
+
+**文件不存在时的排查**(典型症状:`dsh web` 启动报
+`Cannot find module '../../../build/Release/node_datachannel.node'`):
+
+- **pnpm < 10(如 8.x)**:没有脚本跳过机制,二进制缺失说明 install 脚本
+  跑了但**下载失败**——预编译包从 GitHub Releases 下载,国内网络常超时。
+  强制重跑并挂代理:
+  ```bash
+  pnpm rebuild node-datachannel
+  # 失败/卡住时:
+  HTTPS_PROXY=http://127.0.0.1:<代理端口> pnpm rebuild node-datachannel
+  ```
+  若它转而本地编译并报缺 cmake:`brew install cmake` 后重跑(较慢)。
+- **pnpm ≥ 10**:检查 yaml 键名拼写与缩进,改完**必须重跑 install**
+  (只改配置不会补跑脚本)。
+
 ### 3. 合并 patch + 填 config
 
 把 [cordis.patch.yml](cordis.patch.yml) 的 insert 段(+ 前面的
