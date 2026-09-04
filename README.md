@@ -26,18 +26,69 @@ DeepSeek Harness 的移动接入插件:网关(Cloudflare Worker,
 
 ## 安装
 
+前置:
+- **pnpm** 在 PATH 上(`dsh plugin` 本体只是对 profile 目录的 pnpm 转发器,
+  没有 pnpm 直接报 127 退出);
+- 网关 Worker 已部署且含信令面(`/signal/*` + `/admin/signal/ticket`);
+- 手机 App 为支持 P2P 的版本(探测 `/signal/caps` 自动走直连)。
+
+### 1. 装插件
+
 ```bash
-dsh plugin --profile web add github:iptton-ai/dsh-mobile   # 或本地目录
-cd <插件目录> && npm install   # node-datachannel 是预编译原生模块,必须装
+dsh plugin --profile web add github:iptton-ai/dsh-mobile   # 或本地目录: add ./dsh-mobile
 ```
+
+> **报 `ERR_PNPM_ADDING_TO_ROOT`?** profile 目录里已有 `pnpm-workspace.yaml`
+> (比如已跑过一次 approve-builds),pnpm 会把它当 workspace、拒绝把依赖加到
+> workspace root。两个解法任选:
+> ① 命令尾追加 `-w`(dsh 转发器原样透传参数):
+>    `dsh plugin --profile web add github:iptton-ai/dsh-mobile -w`;
+> ② 在 profile 的 `pnpm-workspace.yaml` 加一行 `ignoreWorkspaceRootCheck: true`
+>    后重跑原命令(以后 add/update 其他插件也不再问)。
+
+### 2. 放行 node-datachannel 的安装脚本(必做,跳过 = 插件静默坏)
+
+pnpm ≥ 10 默认**不执行依赖的 install 脚本**;本插件的 WebRTC 依赖
+`node-datachannel` 全靠 install 脚本下载预编译原生二进制。跳过的后果是
+**安装期零报错**:`dsh web` 启动时插件 import 崩,侧栏不出现「移动接入」
+入口。在 **profile 目录**(缺省 `~/.dsh/profiles/web/`;设了 `DSH_HOME`
+则在其下)执行:
+
+```bash
+cd ~/.dsh/profiles/web
+pnpm approve-builds                     # ⚠️ 交互式命令,不带包名(见下);勾选 node-datachannel
+dsh plugin --profile web install        # 重跑安装,补跑被跳过的脚本
+```
+
+> **报 `Command "approve-builds" not found`?** 两个常见原因:
+> ① 给 `approve-builds` 传了包名 —— 它是交互式命令不接参数,带参会当成
+>    "执行叫 approve-builds 的命令" 而报 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`;
+> ② pnpm < 10 根本没有这个子命令(`pnpm -v` 确认)。
+> **跨版本最稳的手写法**(不依赖该命令):直接编辑 profile 的
+> `pnpm-workspace.yaml`,加入:
+>
+> ```yaml
+> onlyBuiltDependencies:
+>   - node-datachannel
+> ```
+>
+> 然后重跑 `dsh plugin --profile web install`。
+
+审批写入 profile 的 `pnpm-workspace.yaml` 持久生效,后续
+`dsh plugin --profile web update` 不再丢。
+
+### 3. 合并 patch + 填 config
 
 把 [cordis.patch.yml](cordis.patch.yml) 的 insert 段(+ 前面的
 `directory-picker` 禁用行)合并进 `~/.dsh/profiles/web/cordis.patch.yml`,
-config 按你的部署改,重启 `dsh web`。
+config 按你的部署改(键位见下节「配置」)。
 
-前置:
-- 网关 Worker 已部署且含信令面(`/signal/*` + `/admin/signal/ticket`);
-- 手机 App 为支持 P2P 的版本(探测 `/signal/caps` 自动走直连)。
+### 4. 重启 `dsh web` 并验证
+
+重启后 dsh web 侧栏底部出现**「移动接入」**入口即装好。没出现时按序查:
+① `dsh web` 日志有无 `node-datachannel` import 报错(= 第 2 步被跳过);
+② patch 合并是否完整(insert 段 + `directory-picker` 禁用行);
+③ 改完 patch 后是否重启了 `dsh web`。
 
 ## 配置
 
