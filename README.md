@@ -170,4 +170,33 @@ node tools/plugin-live-smoke.mjs                                            # �
 
 通过判据:消息经 P2P 通道原样返回(业务流量不经过 Worker)。
 
+## 上游兼容性
+
+已核对 dsh **`0.1.3-alpha.2`**(上一记录版 `0.1.2-rc.1`):本插件触点全部兼容,
+**无代码改动**。逐面结论:
+
+- **宿主服务** —— `webServer.register({kind:'prefix',path,handler})`、
+  `settings.register(ns, schema, {base})` 的 `get/watch/update`、
+  `connection.authenticatedUrl()`:`packages/host/webserver`、`packages/settings/settings`
+  在 rc.1→alpha.2 仅 `package.json` 版本号 diff,`browser-auth.ts` 零 diff;
+- **客户端协议** —— `window.__ModuleLoader__.load({id,factory})` + `require('react')`
+  种子 + `slots.inject/register` + `sidebar.footer.action` 槽位不变;
+  `dsh.client` 声明形状(`platform`/`inject`)不变(上游只是把接口挪到
+  `@deepseek-ai/dsh-package-manifest` 的 `DshClientManifest`)。boot 图仍收录
+  `dsh-mobile` 条目,实机(0.1.3-alpha.2 GUI)侧栏入口 + dialog 正常;
+- **`cordis.patch.yml` 行结构** —— `id/name/config/disabled/insert` 不变;
+  web-app bundle 仍有 `directory-picker` 行,browse 后端/前端两包名未变。
+  (上游新增行为:绝对路径的 `insert.name` 也会转 file URL;本插件用包名,不受影响。)
+
+复验(三条都需 exit 0):
+
+```bash
+node --check lib/index.js && node --check lib/client.js   # 语法门
+node tools/contract-smoke.mjs                             # 契约门:mock 宿主跑真实 apply() 的 18 项断言(零网络)
+```
+
+`contract-smoke.mjs` 覆盖:路由注册/撤销、settings 命名空间与 base、`/pair/api/*`
+的 host/auth-url/label/admin-key/state/security-log 行为,以及管理面 loopback +
+同源三重门。**每次升级 dsh 先跑这三条**,再跑上面的端到端冒烟。
+
 MIT License.
