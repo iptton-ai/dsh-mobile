@@ -63,7 +63,7 @@ const call = async (method, url, headers = { host: '127.0.0.1:45999' }, body = n
 }
 
 const host = await call('GET', '/pair/api/host')
-assert('/api/host 200 + p2p 模式', host.status === 200 && host.json.mode === 'p2p', JSON.stringify(host.json))
+assert('/api/host 200 + relay 模式', host.status === 200 && host.json.mode === 'relay', JSON.stringify(host.json))
 assert('/api/host 回机器名与宿主键', host.json.label === 'smoke-host' && typeof host.json.host === 'string')
 
 const auth = await call('GET', '/pair/api/auth-url')
@@ -81,7 +81,9 @@ const keyShort = await call('POST', '/pair/api/admin-key', { host: '127.0.0.1:45
 assert('/api/admin-key POST 拒 <16 字符', keyShort.status === 400, JSON.stringify(keyShort.json))
 
 const state = await call('GET', '/pair/api/state')
-assert('/api/state 200 + p2p 信号状态', state.status === 200 && state.json.mode === 'p2p' && state.json.signal.connected === false)
+assert('/api/state 200 + relay/信号状态', state.status === 200 && state.json.mode === 'relay'
+  && state.json.relay && state.json.relay.connected === false
+  && state.json.signal && state.json.signal.connected === false)
 
 const sec = await call('GET', '/pair/api/security-log')
 assert('/api/security-log 200 + events 数组', sec.status === 200 && Array.isArray(sec.json.events) && sec.json.unack === 0)
