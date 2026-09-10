@@ -172,8 +172,45 @@ node tools/plugin-live-smoke.mjs                                            # �
 
 ## 上游兼容性
 
-已核对 dsh **`0.1.3-alpha.2`**(上一记录版 `0.1.2-rc.1`):本插件触点全部兼容,
-**无代码改动**。逐面结论:
+已核对 dsh **`0.1.5-rc.1`**(上一记录版 `0.1.5-alpha.2`):本插件触点全部兼容,
+**无代码改动**。上游这轮实质变化只有三处,均不触及本插件:LLM 模型目录
+(`deepseek-v4-flash`→`deepseek-flash`;bundle 基线 cordis.patch.yml 改的是
+agent-default-model 的 config 值,清单结构未动)、web 客户端 UI 打磨
+(侧栏右栏/文档预览/代码块/统计 pill)、slot-catalog 一处 source 行号注释。
+逐面核对(对已安装 rc.1 安装体逐一验证):
+
+- **packages/api RPC schema** —— gateway/remotes/session-controller/
+  settings-controller/workspace-controller/workspace-files 六包仅版本号
+  diff,schema 零变化;
+- **插件/extension 接口** —— `webServer.register({kind:'prefix'})`/`.port`
+  getter、`settings.register(ns, schema, {base})` 的 `get/watch/update`、
+  `connection.authenticatedUrl`、`dsh.client` 声明解析(platform/inject)、
+  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:全部
+  在位且形状一致;
+- **客户端协议** —— `__ModuleLoader__.load({id,factory})` + `require('react')`
+  种子不变。
+
+复验(全部需 exit 0):
+
+```bash
+node --check lib/index.js && node --check lib/client.js   # 语法门
+node tools/contract-smoke.mjs                             # 契约门:mock 宿主跑真实 apply(),18 项(零网络)
+node tools/host-live-smoke.mjs                            # 真宿主门:已装 dsh 的 WebServer+FileSettingsProvider 起真实 HTTP,15 项(零外网)
+```
+
+`host-live-smoke.mjs` 是升级后的第一道硬门:用**已安装 dsh** 的真实
+cordis/WebServer/settings 服务跑本插件真实 apply(),真实 HTTP 逐项断言
+(真实 prefix 路由、真实 .port、settings 磁盘落盘、管理面三重门、dispose
+下线)。connection 服务因拖 credentials 持久化不起真身,给形状桩。定位
+已装 dsh 用 `DSH_GLOBAL_ROOT`,缺省 `npm root -g` 下的
+`@deepseek-ai/dsh/node_modules`。**每次升级 dsh 先跑这三条**,再按需跑
+上面的端到端冒烟。
+
+---
+
+### 历史:0.1.3-alpha.2(上一记录版 0.1.2-rc.1)
+
+本插件触点全部兼容,**无代码改动**。逐面结论:
 
 - **宿主服务** —— `webServer.register({kind:'prefix',path,handler})`、
   `settings.register(ns, schema, {base})` 的 `get/watch/update`、
@@ -188,15 +225,6 @@ node tools/plugin-live-smoke.mjs                                            # �
   web-app bundle 仍有 `directory-picker` 行,browse 后端/前端两包名未变。
   (上游新增行为:绝对路径的 `insert.name` 也会转 file URL;本插件用包名,不受影响。)
 
-复验(三条都需 exit 0):
-
-```bash
-node --check lib/index.js && node --check lib/client.js   # 语法门
-node tools/contract-smoke.mjs                             # 契约门:mock 宿主跑真实 apply() 的 18 项断言(零网络)
-```
-
-`contract-smoke.mjs` 覆盖:路由注册/撤销、settings 命名空间与 base、`/pair/api/*`
-的 host/auth-url/label/admin-key/state/security-log 行为,以及管理面 loopback +
-同源三重门。**每次升级 dsh 先跑这三条**,再跑上面的端到端冒烟。
+当时的复验门:`node --check`(语法)+ `contract-smoke.mjs`(mock 宿主 18 项)。
 
 MIT License.
