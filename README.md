@@ -179,12 +179,13 @@ node tools/plugin-live-smoke.mjs                                            # �
 
 ## 上游兼容性
 
-已核对 dsh **`0.1.5-rc.1`**(上一记录版 `0.1.5-alpha.2`):本插件触点全部兼容,
-**无代码改动**。上游这轮实质变化只有三处,均不触及本插件:LLM 模型目录
-(`deepseek-v4-flash`→`deepseek-flash`;bundle 基线 cordis.patch.yml 改的是
-agent-default-model 的 config 值,清单结构未动)、web 客户端 UI 打磨
-(侧栏右栏/文档预览/代码块/统计 pill)、slot-catalog 一处 source 行号注释。
-逐面核对(对已安装 rc.1 安装体逐一验证):
+已核对 dsh **`0.1.5-rc.2`**(上一记录版 `0.1.5-rc.1`):本插件触点全部兼容,
+**无代码改动**。上游这轮实质变化集中在自带 client UI 插件内部:ui-message-
+feedback 提交语义重构(toggle→retract、对话框按指定评级提交、新增提交失败
+toast)、ui-primitives 的 CodeFileIcon 图稿拆为 manifest+artwork 模块、
+ui-chat/ui-deliverables 间距与文件图标尺寸微调、message-feedback types 一处
+注释措辞;apps/web 仅 e2e 测试变化。逐面核对(对 rc.1→rc.2 全量 diff +
+已安装 rc.2 安装体验证):
 
 - **packages/api RPC schema** —— gateway/remotes/session-controller/
   settings-controller/workspace-controller/workspace-files 六包仅版本号
@@ -192,17 +193,23 @@ agent-default-model 的 config 值,清单结构未动)、web 客户端 UI 打磨
 - **插件/extension 接口** —— `webServer.register({kind:'prefix'})`/`.port`
   getter、`settings.register(ns, schema, {base})` 的 `get/watch/update`、
   `connection.authenticatedUrl`、`dsh.client` 声明解析(platform/inject)、
-  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:全部
-  在位且形状一致;
-- **客户端协议** —— `__ModuleLoader__.load({id,factory})` + `require('react')`
-  种子不变。
+  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:宿主侧
+  全部零 diff,形状与 rc.1 一致;
+- **cordis.patch 清单结构** —— 本轮未触及(`disabled`/`insert` 结构与
+  `directory-picker-browse` 后端/前端两包名不变,profile 合并块无需同步);
+- **客户端协议** —— apps/web 客户端 src 零 diff;`__ModuleLoader__.load(
+  {id,factory})` + `require('react')` 种子 + `slots.inject/register` 协议
+  不变;ui-message-feedback 改的是它自家的插件内 slot 接口
+  (MessageFeedbackInjected 等),不是通用 slot 协议,schemastery 与
+  client 模块加载器均零 diff。
 
-复验(全部需 exit 0):
+复验(2026-09-12 实测,全部 exit 0):
 
 ```bash
 node --check lib/index.js && node --check lib/client.js   # 语法门
 node tools/contract-smoke.mjs                             # 契约门:mock 宿主跑真实 apply(),18 项(零网络)
 node tools/host-live-smoke.mjs                            # 真宿主门:已装 dsh 的 WebServer+FileSettingsProvider 起真实 HTTP,15 项(零外网)
+node tools/crypto-vectors.mjs                             # E2E 加密向量自检,6 cases(零网络)
 ```
 
 `host-live-smoke.mjs` 是升级后的第一道硬门:用**已安装 dsh** 的真实
@@ -210,8 +217,26 @@ cordis/WebServer/settings 服务跑本插件真实 apply(),真实 HTTP 逐项断
 (真实 prefix 路由、真实 .port、settings 磁盘落盘、管理面三重门、dispose
 下线)。connection 服务因拖 credentials 持久化不起真身,给形状桩。定位
 已装 dsh 用 `DSH_GLOBAL_ROOT`,缺省 `npm root -g` 下的
-`@deepseek-ai/dsh/node_modules`。**每次升级 dsh 先跑这三条**,再按需跑
+`@deepseek-ai/dsh/node_modules`。**每次升级 dsh 先跑这四条**,再按需跑
 上面的端到端冒烟。
+
+---
+
+### 历史:0.1.5-rc.1(上一记录版 0.1.5-alpha.2)
+
+本插件触点全部兼容,**无代码改动**。上游这轮实质变化只有三处,均不触及
+本插件:LLM 模型目录(`deepseek-v4-flash`→`deepseek-flash`;bundle 基线
+cordis.patch.yml 改的是 agent-default-model 的 config 值,清单结构未动)、
+web 客户端 UI 打磨(侧栏右栏/文档预览/代码块/统计 pill)、slot-catalog
+一处 source 行号注释。逐面核对(对已安装 rc.1 安装体逐一验证):
+packages/api 六包仅版本号 diff;插件/extension 接口触点(webServer
+register/.port、settings.register get/watch/update、connection
+authenticatedUrl、dsh.client 声明、client.js 下发路由、sidebar.footer.action
+槽位)全部在位且形状一致;客户端协议 `__ModuleLoader__.load({id,factory})`
++ `require('react')` 种子不变。
+
+复验:`node --check`(语法)+ `contract-smoke.mjs`(mock 宿主 18 项)+
+`host-live-smoke.mjs`(真宿主 15 项;该工具即本轮新增的升级后第一道硬门)。
 
 ---
 
