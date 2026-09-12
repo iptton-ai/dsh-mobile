@@ -7,9 +7,16 @@ DeepSeek Harness 的移动接入插件:网关(Cloudflare Worker,
 [DeepseekHarnessApp](https://github.com/iptton-ai/DeepseekHarnessApp) 使用。
 
 ```
-手机 App ──wss(仅信令)──→ CF Worker 网关 ←─wss(仅信令)─ 本插件
-   └────────── WebRTC DataChannel(直连,业务流量不经网关)──────────┘
+手机 App ──wss(vstream 帧中转;扫码配对启用 E2E 加密)──→ CF Worker 网关
+                                                              │
+本插件(宿主)──────── wss(vstream 帧中转)──────────────────┘
+   └── P2P DataChannel(备选直连:业务流量不经网关,网络允许时可用)
 ```
+
+> 2026-09-10 起默认链路为**网关中转**(P2P 在办公网/蜂窝不可达,降为备选);
+> 2026-09-12 起扫码配对默认启用**端到端加密**(PSK 经 QR 带外,网关只见
+> 密文;协议与互操作向量见 PROTOCOL.md §5)。下文「零中转」「仅信令」等
+> 段落为 P2P-only 时代历史描述,以 PROTOCOL.md 为准。
 
 - **配对**:扫码/手输(双向亮码防抢注);设备令牌由 Worker 签发/吊销,
   令牌绑定的 host 路由键只是登记标识;
