@@ -179,31 +179,36 @@ node tools/plugin-live-smoke.mjs                                            # �
 
 ## 上游兼容性
 
-已核对 dsh **`0.1.5-rc.2`**(上一记录版 `0.1.5-rc.1`):本插件触点全部兼容,
-**无代码改动**。上游这轮实质变化集中在自带 client UI 插件内部:ui-message-
-feedback 提交语义重构(toggle→retract、对话框按指定评级提交、新增提交失败
-toast)、ui-primitives 的 CodeFileIcon 图稿拆为 manifest+artwork 模块、
-ui-chat/ui-deliverables 间距与文件图标尺寸微调、message-feedback types 一处
-注释措辞;apps/web 仅 e2e 测试变化。逐面核对(对 rc.1→rc.2 全量 diff +
-已安装 rc.2 安装体验证):
+已核对 dsh **`0.1.6-alpha.1`**(上一记录版 `0.1.5-rc.2`):本插件触点全部兼容,
+**无代码改动**。上游这轮是 alpha 断层,变化量大但集中在本插件不触及的面:
+新增 terminal-controller / permission-presets 两个 RPC namespace(remotes
+加挂,对既有 namespace 纯增量)、session-controller fork 边界收紧(内部
+行为)、vendor/loader 的 Entry/内部解析大重构(`apply(ctx, config)` 契约与
+`registry.plugin` 路径不变)、client-modules 双半边内部重构(浏览器半边
+`ctx.modules` 改由 `Loader.internal` 提供、manifest 解析迁到 `manifest.ts`,
+但 `dsh.client` 声明语义、`lib/client.js` bundle 下发、`inject` 仅情报性
+均不变)、boot profile 解析模式化(profile 行名解析从 healed node_modules
+兜底改为 link 模式物化)。逐面核对(对 rc.2→alpha.1 全量 diff + 已安装
+alpha.1 安装体验证):
 
-- **packages/api RPC schema** —— gateway/remotes/session-controller/
-  settings-controller/workspace-controller/workspace-files 六包仅版本号
-  diff,schema 零变化;
+- **packages/api RPC schema** —— settings-controller / webserver 仅文档与
+  版本号;gateway src 仅导出两个内部错误分支函数;remotes 新增
+  permission-presets / terminal 两个 remote 挂载与一条转发事件,既有
+  namespace 零变化;
 - **插件/extension 接口** —— `webServer.register({kind:'prefix'})`/`.port`
   getter、`settings.register(ns, schema, {base})` 的 `get/watch/update`、
   `connection.authenticatedUrl`、`dsh.client` 声明解析(platform/inject)、
-  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:宿主侧
-  全部零 diff,形状与 rc.1 一致;
-- **cordis.patch 清单结构** —— 本轮未触及(`disabled`/`insert` 结构与
-  `directory-picker-browse` 后端/前端两包名不变,profile 合并块无需同步);
-- **客户端协议** —— apps/web 客户端 src 零 diff;`__ModuleLoader__.load(
-  {id,factory})` + `require('react')` 种子 + `slots.inject/register` 协议
-  不变;ui-message-feedback 改的是它自家的插件内 slot 接口
-  (MessageFeedbackInjected 等),不是通用 slot 协议,schemastery 与
-  client 模块加载器均零 diff。
+  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:触点
+  全部在位且形状一致;
+- **cordis.patch 清单结构** —— `EntryOptions`(id/name/config/group/
+  disabled/inject)与 `disabled`/`insert` 写法不变,
+  `directory-picker-browse` 后端/前端两包名不变,profile 合并块无需同步;
+  但 boot 的 profile 行名解析机制变了(bare 名解析走 link 模式物化),
+  升级后建议开一次 `dsh web` 确认 profile 里三行 insert 正常加载;
+- **客户端协议** —— `__ModuleLoader__.load({id,factory})` + `require('react')`
+  种子 + `slots.inject/register` 协议不变;schemastery 零 diff。
 
-复验(2026-09-12 实测,全部 exit 0):
+复验(2026-09-13 实测,全部 exit 0):
 
 ```bash
 node --check lib/index.js && node --check lib/client.js   # 语法门
@@ -221,6 +226,13 @@ cordis/WebServer/settings 服务跑本插件真实 apply(),真实 HTTP 逐项断
 上面的端到端冒烟。
 
 ---
+
+### 历史:0.1.5-rc.2(上一记录版 0.1.5-rc.1)
+
+本插件触点全部兼容,**无代码改动**。上游变化集中在自带 client UI 插件内部
+(ui-message-feedback 提交语义重构、ui-primitives 图稿拆分、间距微调),
+packages/api 六包仅版本号 diff,apps/web 客户端 src 零 diff;profile 合并块
+无需同步。
 
 ### 历史:0.1.5-rc.1(上一记录版 0.1.5-alpha.2)
 
