@@ -179,36 +179,35 @@ node tools/plugin-live-smoke.mjs                                            # �
 
 ## 上游兼容性
 
-已核对 dsh **`0.1.6-alpha.1`**(上一记录版 `0.1.5-rc.2`):本插件触点全部兼容,
-**无代码改动**。上游这轮是 alpha 断层,变化量大但集中在本插件不触及的面:
-新增 terminal-controller / permission-presets 两个 RPC namespace(remotes
-加挂,对既有 namespace 纯增量)、session-controller fork 边界收紧(内部
-行为)、vendor/loader 的 Entry/内部解析大重构(`apply(ctx, config)` 契约与
-`registry.plugin` 路径不变)、client-modules 双半边内部重构(浏览器半边
-`ctx.modules` 改由 `Loader.internal` 提供、manifest 解析迁到 `manifest.ts`,
-但 `dsh.client` 声明语义、`lib/client.js` bundle 下发、`inject` 仅情报性
-均不变)、boot profile 解析模式化(profile 行名解析从 healed node_modules
-兜底改为 link 模式物化)。逐面核对(对 rc.2→alpha.1 全量 diff + 已安装
-alpha.1 安装体验证):
+已核对 dsh **`0.1.6-alpha.2`**(上一记录版 `0.1.6-alpha.1`):本插件触点全部
+兼容,**无代码改动**。上游这轮变化集中在本插件不触及的面:session-controller
+client 半侧大重构(sessions service/projection 拆分,宿主 RPC schema 零变化)、
+terminal-controller 新增 bindings/retention(纯增量 namespace)、新增
+plugin-manager / office-to-pdf 两个 remote 挂载、client-modules 组合产物从
+内容寻址改为 revision 寻址并支持包内懒加载 chunk(注册协议向后兼容:
+`ClientBundleRegistration.chunk` 可选)、desktop boot 走 `dshDesktopBoot` 门控
+(served web 路径不变)。逐面核对(对 alpha.1→alpha.2 全量 diff + 已装
+alpha.2 安装体验证):
 
-- **packages/api RPC schema** —— settings-controller / webserver 仅文档与
-  版本号;gateway src 仅导出两个内部错误分支函数;remotes 新增
-  permission-presets / terminal 两个 remote 挂载与一条转发事件,既有
-  namespace 零变化;
+- **packages/api RPC schema** —— session-controller 改的是 client 半侧内部
+  (宿主 contract sessions.ts 形状零变化);terminal-controller/workspace-files
+  为纯增量或内部实现(readAll 改走 fs.readBytes,错误码不变);gateway/
+  remotes 仅新增挂载,既有 namespace 零变化;settings-controller 仅版本号;
 - **插件/extension 接口** —— `webServer.register({kind:'prefix'})`/`.port`
-  getter、`settings.register(ns, schema, {base})` 的 `get/watch/update`、
-  `connection.authenticatedUrl`、`dsh.client` 声明解析(platform/inject)、
-  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位:触点
-  全部在位且形状一致;
-- **cordis.patch 清单结构** —— `EntryOptions`(id/name/config/group/
-  disabled/inject)与 `disabled`/`insert` 写法不变,
-  `directory-picker-browse` 后端/前端两包名不变,profile 合并块无需同步;
-  但 boot 的 profile 行名解析机制变了(bare 名解析走 link 模式物化),
-  升级后建议开一次 `dsh web` 确认 profile 里三行 insert 正常加载;
+  getter(webserver src 零 diff)、`settings.register(ns, schema, {base})`、
+  `connection.authenticatedUrl`、`dsh.client` 声明解析、
+  `/plugins/<id>/client.js` 下发路由、`sidebar.footer.action` 槽位
+  (ui-sidebar contract 在位):触点全部在位且形状一致。connection 新增
+  `connection/request` waterfall 事件与 `streamBaseUrl` hook,均为可选增量;
+- **cordis.patch 清单结构** —— vendor/loader 零 diff,`EntryOptions` 与
+  `disabled`/`insert` 写法不变,`directory-picker-browse` 两包名不变,
+  profile 合并块无需同步;
 - **客户端协议** —— `__ModuleLoader__.load({id,factory})` + `require('react')`
-  种子 + `slots.inject/register` 协议不变;schemastery 零 diff。
+  种子 + `slots.inject/register` 协议不变;`chunk` 字段为可选增量,
+  既有单文件 bundle 注册不受影响。
 
-复验(2026-09-13 实测,全部 exit 0):
+复验(2026-09-16 实测,对真实 `@deepseek-ai/dsh@0.1.6-alpha.2` 宿主,全部
+exit 0):
 
 ```bash
 node --check lib/index.js && node --check lib/client.js   # 语法门
@@ -226,6 +225,14 @@ cordis/WebServer/settings 服务跑本插件真实 apply(),真实 HTTP 逐项断
 上面的端到端冒烟。
 
 ---
+
+### 历史:0.1.6-alpha.1(上一记录版 0.1.5-rc.2)
+
+alpha 断层,变化量大但触点零变化,**无代码改动**:新增 terminal-controller /
+permission-presets 两个 RPC namespace;vendor/loader Entry 大重构但
+`apply(ctx, config)` 契约与 patch 清单写法不变;client-modules 双半边内部
+重构(`dsh.client` 语义、client.js 下发、slot 协议不变);boot profile 行名
+改 link 模式物化,升级后开一次 `dsh web` 确认 insert 行加载(已确认)。
 
 ### 历史:0.1.5-rc.2(上一记录版 0.1.5-rc.1)
 
