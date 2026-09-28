@@ -27,7 +27,9 @@ DeepSeek Harness 的移动接入插件:网关(Cloudflare Worker,
   手机侧同样起本地回环代理 —— 两端 HTTP/WebSocket 栈零改动;
 - **UI**:侧栏 foot「移动接入」dialog:P2P 状态(信令通道/活跃会话/
   虚拟流计数)+ 机器名 + 配对 + 设备管理(链路徽章)+ 安全事件横幅
-  (配对/吊销 OS 通知与角标)。
+  (配对/吊销 OS 通知与角标)。入口在本机可打通的页面可见:回环 http(s)
+  源(`dsh web` 的浏览器页)与 dsh desktop 外壳(`dsh-app://app/`)都挂;
+  局域网/公网源不挂(管理面只对 loopback 开放,见「安全模型」)。
 
 协议细节(信令消息 + vstream 帧格式)见 [PROTOCOL.md](PROTOCOL.md)。
 
@@ -214,6 +216,7 @@ node --check lib/index.js && node --check lib/client.js   # 语法门
 node tools/contract-smoke.mjs                             # 契约门:mock 宿主跑真实 apply(),18 项(零网络)
 node tools/host-live-smoke.mjs                            # 真宿主门:已装 dsh 的 WebServer+FileSettingsProvider 起真实 HTTP,15 项(零外网)
 node tools/crypto-vectors.mjs                             # E2E 加密向量自检,6 cases(零网络)
+node tools/client-guard-smoke.mjs                         # 客户端门:入口可见性矩阵(回环/dsh-app 外壳挂,局域网/公网不挂),15 项(零网络)
 ```
 
 `host-live-smoke.mjs` 是升级后的第一道硬门:用**已安装 dsh** 的真实
