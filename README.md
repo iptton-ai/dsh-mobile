@@ -47,6 +47,15 @@ DeepSeek Harness 的移动接入插件:网关(Cloudflare Worker,
 dsh plugin --profile web add github:iptton-ai/dsh-mobile   # 或本地目录: add ./dsh-mobile
 ```
 
+本包声明了 `dsh.bundle.patch`(指向自带的 [cordis.patch.yml](cordis.patch.yml)),
+因此它是一个**组合包**:装好后会出现在 Web 侧栏「插件」页的 **Installed** 组,
+开关即启用状态;被选中时它自带的 patch 作为组合包层自动生效(禁用官方 native
+目录选择器 + 挂 browse 双前端 + 插入 `dsh-mobile` 行)。也可以在插件页用
+**Add plugin** 直接装。
+
+> 老文档让人**手工合并 insert 段** —— 现在不需要了,照做反而会让同一批 id 在
+> 组合树里出现两次。已经手工合并过的,见第 3 步的迁移说明。
+
 > **报 `ERR_PNPM_ADDING_TO_ROOT`?** profile 目录里已有 `pnpm-workspace.yaml`
 > (比如已跑过一次 approve-builds),pnpm 会把它当 workspace、拒绝把依赖加到
 > workspace root。两个解法任选:
@@ -110,18 +119,37 @@ ls node_modules/.pnpm/node-datachannel@*/node_modules/node-datachannel/build/Rel
 - **pnpm ≥ 10**:检查 yaml 键名拼写与缩进,改完**必须重跑 install**
   (只改配置不会补跑脚本)。
 
-### 3. 合并 patch + 填 config
+### 3. 填 config
 
-把 [cordis.patch.yml](cordis.patch.yml) 的 insert 段(+ 前面的
-`directory-picker` 禁用行)合并进 `~/.dsh/profiles/web/cordis.patch.yml`,
-config 按你的部署改(键位见下节「配置」)。
+行结构由组合包自带的 patch 提供,**不需要手工合并 insert**。你只需要在 profile
+自己的 `cordis.patch.yml` 里按 id 覆盖部署相关的 config(用户层在组合包层之后,
+同一行的 config 以用户层为准):
+
+```yaml
+- id: dsh-mobile
+  name: "dsh-mobile"
+  config:
+    gateway: https://dsh.example.com
+    adminKey: '<ADMIN_KEY>'
+```
+
+键位见下节「配置」。插件页里 `dsh-mobile` 的开关如果没打开,打开它即可 ——
+它就是 profile `package.json` 的 `dsh.profile.bundles` 里的 `dsh-mobile` 行。
+
+> **已按旧文档手工合并过 patch?** 先删掉你自己 `cordis.patch.yml` 里那段
+> `- insert:`(`directory-picker-browse` / `ui-directory-picker-browse` /
+> `dsh-mobile`)和前面的 `- id: directory-picker / disabled: true`,只留上面这段
+> id 覆盖的 config,再去插件页把 `dsh-mobile` 开关打开。否则同一批 id 会在组合树
+> 里出现两次(`dsh --profile <name> --dump-config` 可见),宿主半边会被挂载两遍。
 
 ### 4. 重启 `dsh web` 并验证
 
 重启后 dsh web 侧栏底部出现**「移动接入」**入口即装好。没出现时按序查:
 ① `dsh web` 日志有无 `node-datachannel` import 报错(= 第 2 步被跳过);
-② patch 合并是否完整(insert 段 + `directory-picker` 禁用行);
-③ 改完 patch 后是否重启了 `dsh web`。
+② 组合包是否启用(插件页 Installed 组的 `dsh-mobile` 开关 / profile `package.json`
+   的 `dsh.profile.bundles`)+ config 是否填了 gateway;
+③ 改完 patch/开关后是否重启了 `dsh web`(desktop 外壳还需重启应用:窗口的模块
+   清单是启动快照,且模块根不走 HMR)。
 
 ## 配置
 
