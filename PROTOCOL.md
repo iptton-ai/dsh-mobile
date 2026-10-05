@@ -32,7 +32,7 @@ WS 端点(均 JSON 文本帧):
 **host ticket**:Mac 经管理面(公网 HTTPS + Bearer adminKey/租户钥)
 `POST /admin/signal/ticket {"host":"<宿主路由键>"}` 获取,JWT claims
 `{sub:"dsh-host", host, iat, exp}`(TTL 900s,Mac 每 5min 刷新)。
-host = 宿主在网关的登记标识(如 `<主机名>.p2p`),仅作信令路由键,无隧道语义;
+host = 宿主在网关的登记标识(如 `<主机名>.host`),仅作信令路由键,无隧道语义;
 已登记宿主受租户归属仲裁(别家租户钥签不出它的 ticket,防宿主冒充)。
 
 ### 消息

@@ -1,7 +1,7 @@
 {
   "name": "dsh-mobile",
   "version": "0.2.0",
-  "description": "DshAPP mobile access for DeepSeek Harness: CF Worker gateway (pairing + WebRTC signaling only) + P2P DataChannel direct link, no traffic relay, one plugin.",
+  "description": "DshAPP mobile access for DeepSeek Harness: CF Worker gateway (pairing + WS relay data plane, E2E-encrypted), relay is the only data link.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -10,8 +10,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.4",
-    "node-datachannel": "^0.26.0"
+    "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {
     "bundle": {
@@ -23,6 +22,6 @@
     }
   },
   "license": "MIT",
-  "keywords": ["dsh", "deepseek-harness", "plugin", "mobile", "pairing", "p2p", "webrtc"],
+  "keywords": ["dsh", "deepseek-harness", "plugin", "mobile", "pairing", "relay"],
   "files": ["lib", "cordis.patch.yml", "README.md", "PROTOCOL.md"]
 }

@@ -159,7 +159,7 @@ cordis.patch.yml 的 `dsh-mobile` 行 config(`DSH_MOBILE_*` 环境变量可覆�
 |---|---|---|
 | `gateway` | CF Worker 网关地址(如 `https://dsh.example.com`) | 必填 |
 | `adminKey` | 管理密钥(部署 Worker 时的 ADMIN_KEY,≥16 字符)。**优先级:env `DSH_MOBILE_ADMIN_KEY` > 面板「管理密钥」栏(用户 settings)> 此处 config** —— config 是明文模板位,profile yml 常随 dotfiles 同步,能不用就不用 | 必填* |
-| `host` | 宿主路由键(多宿主各占一个;仅登记标识,无隧道语义) | `<短主机名>.p2p` |
+| `host` | 宿主路由键(多宿主各占一个;仅登记标识,无隧道语义) | `<短主机名>.host` |
 | `publicUrl` | 扫码落地页 | `<gateway>/pair` |
 | `label` | 机器名(缺省 hostname;面板可改,持久化) | — |
 | `iceServers` | ICE 服务器(JSON 数组字符串;缺省公共 STUN,无 TURN;只作用于 Mac 侧 gather,手机侧由网关 `ICE_SERVERS` 下发) | 公共 STUN |
