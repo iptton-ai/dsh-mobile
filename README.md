@@ -153,6 +153,12 @@ ls node_modules/.pnpm/node-datachannel@*/node_modules/node-datachannel/build/Rel
 
 ## 配置
 
+> **2026-10-05 起四项均可在面板直接编辑**:「移动接入」面板新增**「中转网关」区**
+> (gateway + host 输入框),连同既有的「机器名」(label)与「管理密钥」(adminKey)
+> 栏,保存在本机 dsh 用户设置、即时生效 —— **自布中转服务器的使用者全程无需碰
+> cordis.patch.yml**。优先级:env `DSH_MOBILE_*` > 面板(settings)> 此处 config。
+> 下方表格的 config 键仅作部署模板/回落位。
+
 cordis.patch.yml 的 `dsh-mobile` 行 config(`DSH_MOBILE_*` 环境变量可覆盖):
 
 | 键 | 说明 | 默认 |
