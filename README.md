@@ -251,6 +251,7 @@ node tools/contract-smoke.mjs                             # 契约门:mock 宿�
 node tools/host-live-smoke.mjs                            # 真宿主门:已装 dsh 的 WebServer+FileSettingsProvider 起真实 HTTP,15 项(零外网)
 node tools/crypto-vectors.mjs                             # E2E 加密向量自检,6 cases(零网络)
 node tools/client-guard-smoke.mjs                         # 客户端门:入口可见性矩阵(回环/dsh-app 外壳挂,局域网/公网不挂),15 项(零网络)
+node tools/teardown-guard-smoke.mjs                       # 宿主退出兜底门:断开 IPC 后兜底退出(桌面升级 teardown 回归),3 项(零网络)
 ```
 
 `host-live-smoke.mjs` 是升级后的第一道硬门:用**已安装 dsh** 的真实
