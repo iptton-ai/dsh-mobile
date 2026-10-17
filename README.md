@@ -36,90 +36,49 @@ DeepSeek Harness 的移动接入插件:网关(Cloudflare Worker,
 ## 安装
 
 前置:
-- **pnpm** 在 PATH 上(`dsh plugin` 本体只是对 profile 目录的 pnpm 转发器,
-  没有 pnpm 直接报 127 退出);
-- 网关 Worker 已部署且含信令面(`/signal/*` + `/admin/signal/ticket`);
-- 手机 App 为支持 P2P 的版本(探测 `/signal/caps` 自动走直连)。
+- 网关 Worker 已部署(配对 + `/relay/*` 中转 + `/admin/*` 管理面);
+- 手机 App 为走中转的版本(2026-09-10 起)。
 
 ### 1. 装插件
+
+本包声明了 `dsh.bundle.patch`(指向自带的 [cordis.patch.yml](cordis.patch.yml)),
+因此它是一个**组合包**:标准安装命令(`dsh plugin add` / 桌面 App 插件页
+**Add plugin**)装完即被 reconcile 自动登记进 profile `package.json` 的
+`dsh.profile.bundles` 并启用;它自带的 patch 作为组合包层自动生效(禁用官方
+native 目录选择器 + 挂 browse 双前端 + 插入 `dsh-mobile` 行)。
+
+**`dsh web` / 其他 CLI profile(dsh 0.1.7+ 与 0.2.x 同一命令):**
 
 ```bash
 dsh plugin --profile web add github:iptton-ai/dsh-mobile   # 或本地目录: add ./dsh-mobile
 ```
 
-本包声明了 `dsh.bundle.patch`(指向自带的 [cordis.patch.yml](cordis.patch.yml)),
-因此它是一个**组合包**:装好后会出现在 Web 侧栏「插件」页的 **Installed** 组,
-开关即启用状态;被选中时它自带的 patch 作为组合包层自动生效(禁用官方 native
-目录选择器 + 挂 browse 双前端 + 插入 `dsh-mobile` 行)。也可以在插件页用
-**Add plugin** 直接装。
+**DeepSeek Harness 桌面 App(desktop profile,0.2.x):** desktop profile 被
+Electron 独占,外部 `dsh` 二进制会被拒(profile "desktop" is managed
+exclusively by the Electron application);用 App 自带的 CLI 入口(以
+ELECTRON_RUN_AS_NODE 跑 asar 里的 desktop-host cli.js,自带钉版 pnpm):
+
+```bash
+ELECTRON_RUN_AS_NODE=1 "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness" \
+  "/Applications/DeepSeek Harness.app/Contents/Resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js" \
+  plugin --profile desktop add /path/to/dsh-mobile
+```
+
+装完重启桌面 App(窗口的模块清单是启动快照,模块根不走 HMR)。也可以在
+App 的「插件」页直接 Add plugin / 打开开关,效果等价(同一套
+plugin-manager reconcile)。
 
 > 老文档让人**手工合并 insert 段** —— 现在不需要了,照做反而会让同一批 id 在
-> 组合树里出现两次。已经手工合并过的,见第 3 步的迁移说明。
+> 组合树里出现两次。已经手工合并过的,见第 2 步的迁移说明。
 
 > **报 `ERR_PNPM_ADDING_TO_ROOT`?** profile 目录里已有 `pnpm-workspace.yaml`
 > (比如已跑过一次 approve-builds),pnpm 会把它当 workspace、拒绝把依赖加到
 > workspace root。两个解法任选:
-> ① 命令尾追加 `-w`(dsh 转发器原样透传参数):
->    `dsh plugin --profile web add github:iptton-ai/dsh-mobile -w`;
+> ① 命令尾追加 `-w`(dsh 转发器原样透传参数);
 > ② 在 profile 的 `pnpm-workspace.yaml` 加一行 `ignoreWorkspaceRootCheck: true`
 >    后重跑原命令(以后 add/update 其他插件也不再问)。
 
-### 2. 放行 node-datachannel 的安装脚本(必做,跳过 = 插件静默坏)
-
-pnpm ≥ 10 默认**不执行依赖的 install 脚本**;本插件的 WebRTC 依赖
-`node-datachannel` 全靠 install 脚本下载预编译原生二进制。跳过的后果是
-**安装期零报错**:`dsh web` 启动时插件 import 崩,侧栏不出现「移动接入」
-入口。在 **profile 目录**(缺省 `~/.dsh/profiles/web/`;设了 `DSH_HOME`
-则在其下)执行:
-
-```bash
-cd ~/.dsh/profiles/web
-pnpm approve-builds                     # ⚠️ 交互式命令,不带包名(见下);勾选 node-datachannel
-dsh plugin --profile web install        # 重跑安装,补跑被跳过的脚本
-```
-
-> **报 `Command "approve-builds" not found`?** 两个常见原因:
-> ① 给 `approve-builds` 传了包名 —— 它是交互式命令不接参数,带参会当成
->    "执行叫 approve-builds 的命令" 而报 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`;
-> ② pnpm < 10 根本没有这个子命令(`pnpm -v` 确认)。
-> **跨版本最稳的手写法**(不依赖该命令):直接编辑 profile 的
-> `pnpm-workspace.yaml`,加入:
->
-> ```yaml
-> onlyBuiltDependencies:
->   - node-datachannel
-> ```
->
-> 然后重跑 `dsh plugin --profile web install`。
-
-审批写入 profile 的 `pnpm-workspace.yaml` 持久生效,后续
-`dsh plugin --profile web update` 不再丢。
-
-#### 验证二进制真的落盘了
-
-第 2 步做完别急着重启,先确认预编译二进制存在(路径里的版本号以实际为准):
-
-```bash
-ls node_modules/.pnpm/node-datachannel@*/node_modules/node-datachannel/build/Release/
-# 应能看到 node_datachannel.node
-```
-
-**文件不存在时的排查**(典型症状:`dsh web` 启动报
-`Cannot find module '../../../build/Release/node_datachannel.node'`):
-
-- **pnpm < 10(如 8.x)**:没有脚本跳过机制,二进制缺失说明 install 脚本
-  跑了但**下载失败**——预编译包从 GitHub Releases 下载,国内网络常超时。
-  强制重跑并挂代理:
-  ```bash
-  pnpm rebuild node-datachannel
-  # 失败/卡住时:
-  HTTPS_PROXY=http://127.0.0.1:<代理端口> pnpm rebuild node-datachannel
-  ```
-  若它转而本地编译并报缺 cmake:`brew install cmake` 后重跑(较慢)。
-- **pnpm ≥ 10**:检查 yaml 键名拼写与缩进,改完**必须重跑 install**
-  (只改配置不会补跑脚本)。
-
-### 3. 填 config
+### 2. 填 config
 
 行结构由组合包自带的 patch 提供,**不需要手工合并 insert**。你只需要在 profile
 自己的 `cordis.patch.yml` 里按 id 覆盖部署相关的 config(用户层在组合包层之后,
@@ -142,14 +101,14 @@ ls node_modules/.pnpm/node-datachannel@*/node_modules/node-datachannel/build/Rel
 > id 覆盖的 config,再去插件页把 `dsh-mobile` 开关打开。否则同一批 id 会在组合树
 > 里出现两次(`dsh --profile <name> --dump-config` 可见),宿主半边会被挂载两遍。
 
-### 4. 重启 `dsh web` 并验证
+### 3. 重启宿主并验证
 
-重启后 dsh web 侧栏底部出现**「移动接入」**入口即装好。没出现时按序查:
-① `dsh web` 日志有无 `node-datachannel` import 报错(= 第 2 步被跳过);
-② 组合包是否启用(插件页 Installed 组的 `dsh-mobile` 开关 / profile `package.json`
-   的 `dsh.profile.bundles`)+ config 是否填了 gateway;
-③ 改完 patch/开关后是否重启了 `dsh web`(desktop 外壳还需重启应用:窗口的模块
-   清单是启动快照,且模块根不走 HMR)。
+重启后(桌面 App 还需重启应用:窗口的模块清单是启动快照,模块根不走 HMR)
+侧栏底部出现**「移动接入」**入口即装好。没出现时按序查:
+① 组合包是否启用(插件页 Installed 组的 `dsh-mobile` 开关 / profile
+   `package.json` 的 `dsh.profile.bundles`)+ config 是否填了 gateway;
+② 宿主日志有无本插件报错;
+③ 改完 patch/开关后是否重启了宿主。
 
 ## 配置
 
